@@ -178,18 +178,23 @@ func realMain() error {
 // ReadWriterConn wraps the *websocket.Conn to satisfy the io.ReadWriter interface.
 type ReadWriterConn struct {
 	*websocket.Conn
+	rd io.Reader
 }
 
 // Read implements the io.Reader interface.
 func (rwc *ReadWriterConn) Read(p []byte) (int, error) {
 again:
-	_, rd, err := rwc.NextReader()
-	if err != nil {
-		return 0, err
+	if rwc.rd == nil {
+		_, rd, err := rwc.NextReader()
+		if err != nil {
+			return 0, err
+		}
+		rwc.rd = rd
 	}
 
-	n, err := rd.Read(p)
+	n, err := rwc.rd.Read(p)
 	if err == io.EOF {
+		rwc.rd = nil
 		goto again
 	}
 
