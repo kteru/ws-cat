@@ -41,7 +41,7 @@ func realMain() error {
 		URL string
 	}{
 		Headers:     []string{},
-		Origin:      "http://localhost/",
+		Origin:      "",
 		UserPass:    "",
 		InsecureTLS: false,
 		CACert:      "",
@@ -68,11 +68,6 @@ func realMain() error {
 
 	opts.URL = args[0]
 
-	uOrigin, err := url.ParseRequestURI(opts.Origin)
-	if err != nil {
-		return err
-	}
-
 	uURL, err := url.ParseRequestURI(opts.URL)
 	if err != nil {
 		return err
@@ -85,6 +80,10 @@ func realMain() error {
 	httpHeader := http.Header{}
 
 	if opts.Origin != "" {
+		uOrigin, err := url.ParseRequestURI(opts.Origin)
+		if err != nil {
+			return err
+		}
 		httpHeader.Set("Origin", uOrigin.String())
 	}
 
@@ -156,16 +155,14 @@ func realMain() error {
 
 	// Write
 	go func() {
-		if _, err := io.Copy(conn, os.Stdin); err != nil {
-			errCh <- err
-		}
+		_, err := io.Copy(conn, os.Stdin)
+		errCh <- err
 	}()
 
 	// Read
 	go func() {
-		if _, err := io.Copy(os.Stdout, conn); err != nil {
-			errCh <- err
-		}
+		_, err := io.Copy(os.Stdout, conn)
+		errCh <- err
 	}()
 
 	if err := <-errCh; err != nil {
