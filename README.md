@@ -24,7 +24,7 @@ Usage:
 
 Application Options:
   -H, --header=   Add header from <key:value> (Repeat to set multiple)
-  -o, --origin=   Set origin (default: http://localhost/)
+  -o, --origin=   Set origin
   -u, --user=     Add header for basic authentication from <username:password>
   -k, --insecure  Disable verifing server certificates
       --cacert=   Set CA
