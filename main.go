@@ -155,16 +155,14 @@ func realMain() error {
 
 	// Write
 	go func() {
-		if _, err := io.Copy(conn, os.Stdin); err != nil {
-			errCh <- err
-		}
+		_, err := io.Copy(conn, os.Stdin)
+		errCh <- err
 	}()
 
 	// Read
 	go func() {
-		if _, err := io.Copy(os.Stdout, conn); err != nil {
-			errCh <- err
-		}
+		_, err := io.Copy(os.Stdout, conn)
+		errCh <- err
 	}()
 
 	if err := <-errCh; err != nil {
