@@ -35,6 +35,7 @@ func realMain() error {
 		Cert        string   `long:"cert" description:"Set a client certificate"`
 		Key         string   `long:"key" description:"Set a client certificate's key"`
 
+		Text   bool `long:"text" description:"Use text frame when sending instead of binary"`
 		NoComp bool `long:"no-comp" description:"Disable compression"`
 		NoCtx  bool `long:"no-ctx" description:"Disable context takeover"`
 
@@ -48,6 +49,7 @@ func realMain() error {
 		Cert:        "",
 		Key:         "",
 
+		Text:   false,
 		NoComp: false,
 		NoCtx:  false,
 
@@ -149,7 +151,11 @@ func realMain() error {
 	}
 	defer c.Close()
 
-	conn := NewReadWriterConn(c, websocket.BinaryMessage)
+	typ := websocket.BinaryMessage
+	if opts.Text {
+		typ = websocket.TextMessage
+	}
+	conn := NewReadWriterConn(c, typ)
 
 	errCh := make(chan error, 1)
 

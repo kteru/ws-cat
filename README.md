@@ -30,6 +30,7 @@ Application Options:
       --cacert=   Set CA
       --cert=     Set a client certificate
       --key=      Set a client certificate's key
+      --text      Use text frame when sending instead of binary
       --no-comp   Disable compression
       --no-ctx    Disable context takeover
 
