@@ -9,7 +9,17 @@ import (
 // ReadWriterConn wraps the *websocket.Conn to satisfy the io.ReadWriter interface.
 type ReadWriterConn struct {
 	*websocket.Conn
+	writeMsgTyp int
+
 	rd io.Reader
+}
+
+// NewReadWriterConn returns a new ReadWriterConn instance.
+func NewReadWriterConn(conn *websocket.Conn, writeMessageType int) *ReadWriterConn {
+	return &ReadWriterConn{
+		Conn:        conn,
+		writeMsgTyp: writeMessageType,
+	}
 }
 
 // Read implements the io.Reader interface.
@@ -34,7 +44,7 @@ again:
 
 // Write implements the io.Writer interface.
 func (rwc *ReadWriterConn) Write(p []byte) (int, error) {
-	wr, err := rwc.NextWriter(websocket.BinaryMessage)
+	wr, err := rwc.NextWriter(rwc.writeMsgTyp)
 	if err != nil {
 		return 0, err
 	}

@@ -149,7 +149,7 @@ func realMain() error {
 	}
 	defer c.Close()
 
-	conn := &ReadWriterConn{Conn: c}
+	conn := NewReadWriterConn(c, websocket.BinaryMessage)
 
 	errCh := make(chan error, 1)
 
