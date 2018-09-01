@@ -35,6 +35,7 @@ func realMain() error {
 		Cert        string   `long:"cert" description:"Set a client certificate"`
 		Key         string   `long:"key" description:"Set a client certificate's key"`
 
+		Text   bool `long:"text" description:"Use text frame when sending instead of binary"`
 		NoComp bool `long:"no-comp" description:"Disable compression"`
 		NoCtx  bool `long:"no-ctx" description:"Disable context takeover"`
 
@@ -48,6 +49,7 @@ func realMain() error {
 		Cert:        "",
 		Key:         "",
 
+		Text:   false,
 		NoComp: false,
 		NoCtx:  false,
 
@@ -149,7 +151,11 @@ func realMain() error {
 	}
 	defer c.Close()
 
-	conn := &ReadWriterConn{Conn: c}
+	typ := websocket.BinaryMessage
+	if opts.Text {
+		typ = websocket.TextMessage
+	}
+	conn := NewReadWriterConn(c, typ)
 
 	errCh := make(chan error, 1)
 
@@ -170,43 +176,4 @@ func realMain() error {
 	}
 
 	return nil
-}
-
-// ReadWriterConn wraps the *websocket.Conn to satisfy the io.ReadWriter interface.
-type ReadWriterConn struct {
-	*websocket.Conn
-	rd io.Reader
-}
-
-// Read implements the io.Reader interface.
-func (rwc *ReadWriterConn) Read(p []byte) (int, error) {
-again:
-	if rwc.rd == nil {
-		_, rd, err := rwc.NextReader()
-		if err != nil {
-			return 0, err
-		}
-		rwc.rd = rd
-	}
-
-	n, err := rwc.rd.Read(p)
-	if err == io.EOF {
-		rwc.rd = nil
-		goto again
-	}
-
-	return n, err
-}
-
-// Write implements the io.Writer interface.
-func (rwc *ReadWriterConn) Write(p []byte) (int, error) {
-	wr, err := rwc.NextWriter(websocket.BinaryMessage)
-	if err != nil {
-		return 0, err
-	}
-
-	n, err := wr.Write(p)
-	wr.Close()
-
-	return n, err
 }
