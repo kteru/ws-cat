@@ -157,23 +157,35 @@ func realMain() error {
 	}
 	conn := NewReadWriterConn(c, typ)
 
-	errCh := make(chan error, 1)
-
-	// Write
-	go func() {
-		_, err := io.Copy(conn, os.Stdin)
-		errCh <- err
-	}()
-
-	// Read
-	go func() {
+	fnRead := func() error {
 		_, err := io.Copy(os.Stdout, conn)
-		errCh <- err
-	}()
-
-	if err := <-errCh; err != nil {
+		if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+			return nil
+		}
 		return err
 	}
 
-	return nil
+	fnWrite := func() error {
+		_, err := io.Copy(conn, os.Stdin)
+		return err
+	}
+
+	errCh := make(chan error, 1)
+
+	// Read
+	go func() {
+		errCh <- fnRead()
+	}()
+
+	// Write
+	go func() {
+		if err := fnWrite(); err != nil {
+			errCh <- err
+			return
+		}
+
+		errCh <- conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	}()
+
+	return <-errCh
 }
