@@ -10,7 +10,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"regexp"
+	"syscall"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/smith-30/websocket"
@@ -156,6 +158,14 @@ func realMain() error {
 		typ = websocket.TextMessage
 	}
 	conn := NewReadWriterConn(c, typ)
+
+	// Signal handling
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	}()
 
 	fnRead := func() error {
 		_, err := io.Copy(os.Stdout, conn)
