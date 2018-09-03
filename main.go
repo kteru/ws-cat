@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -10,7 +11,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"regexp"
+	"syscall"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/smith-30/websocket"
@@ -39,6 +42,8 @@ func realMain() error {
 		NoComp bool `long:"no-comp" description:"Disable compression"`
 		NoCtx  bool `long:"no-ctx" description:"Disable context takeover"`
 
+		LineBuffered bool `long:"line-buffered" description:"Send messages line by line"`
+
 		URL string
 	}{
 		Headers:     []string{},
@@ -52,6 +57,8 @@ func realMain() error {
 		Text:   false,
 		NoComp: false,
 		NoCtx:  false,
+
+		LineBuffered: false,
 
 		URL: "",
 	}
@@ -157,23 +164,68 @@ func realMain() error {
 	}
 	conn := NewReadWriterConn(c, typ)
 
-	errCh := make(chan error, 1)
-
-	// Write
+	// Signal handling
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		_, err := io.Copy(conn, os.Stdin)
-		errCh <- err
+		<-sigCh
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 	}()
 
-	// Read
-	go func() {
+	fnRead := func() error {
 		_, err := io.Copy(os.Stdout, conn)
-		errCh <- err
-	}()
-
-	if err := <-errCh; err != nil {
+		if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+			return nil
+		}
 		return err
 	}
 
-	return nil
+	fnWrite := func() error {
+		_, err := io.Copy(conn, os.Stdin)
+		return err
+	}
+
+	fnWriteLineByLine := func() error {
+		brd := bufio.NewReader(os.Stdin)
+		for {
+			bs, err := brd.ReadBytes('\n')
+			if err != nil {
+				if err == io.EOF {
+					if len(bs) > 0 {
+						return conn.WriteMessage(typ, bs)
+					}
+					return nil
+				}
+				return err
+			}
+
+			if err := conn.WriteMessage(typ, bs); err != nil {
+				return err
+			}
+		}
+	}
+
+	errCh := make(chan error, 1)
+
+	// Read
+	go func() {
+		errCh <- fnRead()
+	}()
+
+	// Write
+	go func() {
+		fn := fnWrite
+		if opts.LineBuffered {
+			fn = fnWriteLineByLine
+		}
+
+		if err := fn(); err != nil {
+			errCh <- err
+			return
+		}
+
+		errCh <- conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	}()
+
+	return <-errCh
 }
