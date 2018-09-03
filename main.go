@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -41,6 +42,8 @@ func realMain() error {
 		NoComp bool `long:"no-comp" description:"Disable compression"`
 		NoCtx  bool `long:"no-ctx" description:"Disable context takeover"`
 
+		LineBuffered bool `long:"line-buffered" description:"Send messages line by line"`
+
 		URL string
 	}{
 		Headers:     []string{},
@@ -54,6 +57,8 @@ func realMain() error {
 		Text:   false,
 		NoComp: false,
 		NoCtx:  false,
+
+		LineBuffered: false,
 
 		URL: "",
 	}
@@ -180,6 +185,26 @@ func realMain() error {
 		return err
 	}
 
+	fnWriteLineByLine := func() error {
+		brd := bufio.NewReader(os.Stdin)
+		for {
+			bs, err := brd.ReadBytes('\n')
+			if err != nil {
+				if err == io.EOF {
+					if len(bs) > 0 {
+						return conn.WriteMessage(typ, bs)
+					}
+					return nil
+				}
+				return err
+			}
+
+			if err := conn.WriteMessage(typ, bs); err != nil {
+				return err
+			}
+		}
+	}
+
 	errCh := make(chan error, 1)
 
 	// Read
@@ -189,7 +214,12 @@ func realMain() error {
 
 	// Write
 	go func() {
-		if err := fnWrite(); err != nil {
+		fn := fnWrite
+		if opts.LineBuffered {
+			fn = fnWriteLineByLine
+		}
+
+		if err := fn(); err != nil {
 			errCh <- err
 			return
 		}
