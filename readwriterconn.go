@@ -50,7 +50,9 @@ func (rwc *ReadWriterConn) Write(p []byte) (int, error) {
 	}
 
 	n, err := wr.Write(p)
-	wr.Close()
+	if err != nil {
+		return n, err
+	}
 
-	return n, err
+	return n, wr.Close()
 }
